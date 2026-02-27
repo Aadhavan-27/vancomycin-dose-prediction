@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VancoPred — Vancomycin Trough Predictor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=Space+Mono:wght@400;700&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #020a12;
+  --surface: #0b1724;
+  --surface2: #0f2035;
+  --border: rgba(0,200,255,0.12);
+  --accent: #00c8ff;
+  --accent2: #00ff9d;
+  --accent3: #ff6b6b;
+  --accent4: #ffd166;
+  --text: #e8f4ff;
+  --muted: #5a7a94;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Sora', sans-serif;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(0,120,200,0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 40% at 80% 80%, rgba(0,200,120,0.05) 0%, transparent 50%);
+  pointer-events: none; z-index: 0;
+}
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  background-image:
+    linear-gradient(rgba(0,200,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,200,255,0.025) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none; z-index: 0;
+}
+.wrapper { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 28px; }
+
+/* ── HEADER ── */
+header {
+  padding: 28px 0 22px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+  animation: fadeDown 0.8s ease;
+}
+.logo-block { display: flex; align-items: center; gap: 14px; }
+.logo-icon {
+  width: 46px; height: 46px;
+  background: linear-gradient(135deg, #003355, #00c8ff22);
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 20px;
+  animation: pulseGlow 3s ease-in-out infinite;
+}
+@keyframes pulseGlow {
+  0%,100% { box-shadow: 0 0 20px rgba(0,200,255,0.2); }
+  50%      { box-shadow: 0 0 40px rgba(0,200,255,0.5); }
+}
+.logo-text h1 {
+  font-family: 'DM Serif Display', serif; font-size: 1.7rem;
+  background: linear-gradient(135deg, #e8f4ff, #00c8ff);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.logo-text p { font-size: 0.68rem; color: var(--muted); letter-spacing: 2px; text-transform: uppercase; margin-top: 2px; }
+.header-right { display: flex; align-items: center; gap: 12px; }
+.badge {
+  font-family: 'Space Mono', monospace; font-size: 0.65rem;
+  padding: 5px 13px; border: 1px solid var(--accent);
+  border-radius: 100px; color: var(--accent); letter-spacing: 1px;
+}
+.backend-status {
+  display: flex; align-items: center; gap: 6px;
+  font-family: 'Space Mono', monospace; font-size: 0.65rem;
+  color: var(--muted);
+}
+.status-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #555; transition: all 0.4s;
+}
+.status-dot.online  { background: var(--accent2); box-shadow: 0 0 8px var(--accent2); }
+.status-dot.offline { background: var(--accent3); }
+
+/* ── HERO ── */
+.hero { padding: 48px 0 32px; animation: fadeUp 0.9s ease 0.1s both; }
+.hero h2 {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(1.8rem, 4vw, 3.2rem); line-height: 1.15; max-width: 620px;
+}
+.hero h2 em { font-style: italic; color: var(--accent); }
+.hero p { margin-top: 12px; color: var(--muted); font-size: 0.9rem; max-width: 520px; line-height: 1.75; }
+.model-pills { display: flex; gap: 8px; margin-top: 20px; flex-wrap: wrap; }
+.pill {
+  font-family: 'Space Mono', monospace; font-size: 0.65rem;
+  padding: 4px 13px; border-radius: 100px; letter-spacing: 0.5px;
+}
+.pill.rf  { background: rgba(0,200,255,0.1); border: 1px solid rgba(0,200,255,0.3); color: var(--accent); }
+.pill.xgb { background: rgba(0,255,157,0.08); border: 1px solid rgba(0,255,157,0.25); color: var(--accent2); }
+.pill.ens { background: rgba(255,209,102,0.08); border: 1px solid rgba(255,209,102,0.25); color: var(--accent4); }
+.pill.pk  { background: rgba(180,100,255,0.08); border: 1px solid rgba(180,100,255,0.25); color: #b46fff; }
+
+/* ── TABS ── */
+.tab-bar {
+  display: flex; gap: 4px; margin-bottom: 24px;
+  border-bottom: 1px solid var(--border); padding-bottom: 0;
+  animation: fadeUp 1s ease 0.25s both;
+}
+.tab-btn {
+  padding: 10px 20px; border: none; background: transparent;
+  color: var(--muted); font-family: 'Sora', sans-serif; font-size: 0.82rem;
+  font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent;
+  transition: all 0.2s; margin-bottom: -1px;
+}
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* ── MAIN GRID ── */
+.main-grid {
+  display: grid; grid-template-columns: 1fr 390px; gap: 22px;
+  padding-bottom: 60px; animation: fadeUp 1s ease 0.3s both;
+}
+@media (max-width: 920px) { .main-grid { grid-template-columns: 1fr; } }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 18px; overflow: hidden;
+}
+.card-header {
+  padding: 18px 24px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+}
+.card-icon {
+  width: 30px; height: 30px; background: rgba(0,200,255,0.1);
+  border: 1px solid rgba(0,200,255,0.2); border-radius: 8px;
+  display: flex; align-items: center; justify-content: center; font-size: 13px;
+}
+.card-header h3 { font-size: 0.8rem; font-weight: 600; text-transform: uppercase; letter-spacing: 1.5px; }
+.card-header .sub { margin-left: auto; font-family: 'Space Mono', monospace; font-size: 0.62rem; color: var(--muted); }
+.card-body { padding: 24px; }
+
+/* ── FORM ELEMENTS ── */
+.sec-label {
+  font-size: 0.62rem; color: var(--muted); text-transform: uppercase;
+  letter-spacing: 2px; font-weight: 600; margin-bottom: 14px;
+}
+.ig { margin-bottom: 20px; }
+.ig label {
+  display: flex; justify-content: space-between; align-items: baseline;
+  font-size: 0.75rem; font-weight: 500; color: var(--muted);
+  text-transform: uppercase; letter-spacing: 1px; margin-bottom: 7px;
+}
+.ig label .unit { font-family: 'Space Mono', monospace; font-size: 0.62rem; color: rgba(0,200,255,0.5); text-transform: none; letter-spacing: 0; }
+.ig input[type=range] {
+  -webkit-appearance: none; width: 100%; height: 4px;
+  background: linear-gradient(to right, var(--accent) 0%, var(--accent) var(--pct,50%), #0f2035 var(--pct,50%));
+  border-radius: 100px; outline: none; cursor: pointer; border: none; padding: 0;
+}
+.ig input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--bg);
+  box-shadow: 0 0 10px rgba(0,200,255,0.5); cursor: pointer;
+}
+.slider-row { display: flex; justify-content: space-between; margin-top: 5px; font-size: 0.62rem; color: var(--muted); font-family: 'Space Mono', monospace; }
+.slider-row .cur { color: var(--accent); font-weight: 700; }
+.ig select, .ig input[type=number] {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 11px 14px; color: var(--text);
+  font-family: 'Space Mono', monospace; font-size: 0.88rem;
+  transition: all 0.2s; outline: none; appearance: none;
+}
+.ig select:focus, .ig input[type=number]:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,200,255,0.08);
+}
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.gender-toggle { display: flex; }
+.gender-toggle input { display: none; }
+.gender-toggle label {
+  flex: 1; padding: 10px; text-align: center; cursor: pointer;
+  background: var(--surface2); border: 1px solid var(--border);
+  font-size: 0.8rem; font-weight: 500; color: var(--muted);
+  transition: all 0.2s; letter-spacing: 0; text-transform: none; margin: 0;
+}
+.gender-toggle label:first-of-type { border-radius: 10px 0 0 10px; }
+.gender-toggle label:last-of-type  { border-radius: 0 10px 10px 0; }
+.gender-toggle input:checked + label { background: rgba(0,200,255,0.12); border-color: var(--accent); color: var(--accent); }
+.divider { height: 1px; background: var(--border); margin: 6px -24px 20px; }
+
+/* ── PREDICT BUTTON ── */
+.predict-btn {
+  width: 100%; margin-top: 24px; padding: 15px;
+  background: linear-gradient(135deg, #0055aa, #00aaff);
+  border: none; border-radius: 12px; color: #fff;
+  font-family: 'Sora', sans-serif; font-size: 0.95rem; font-weight: 600;
+  cursor: pointer; letter-spacing: 0.3px;
+  box-shadow: 0 4px 20px rgba(0,150,255,0.3);
+  transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px;
+}
+.predict-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,150,255,0.5); }
+.predict-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+.spinner { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; display: none; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── RIGHT PANEL ── */
+.right-panel { display: flex; flex-direction: column; gap: 18px; }
+
+/* Result card */
+.result-card { position: relative; transition: border-color 0.5s; }
+.result-card.lit { border-color: rgba(0,200,255,0.35); }
+.result-body { padding: 24px; min-height: 190px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.empty-state { color: var(--muted); font-size: 0.82rem; text-align: center; line-height: 1.7; }
+.empty-state .ei { font-size: 2.2rem; opacity: 0.3; margin-bottom: 10px; }
+.result-inner { display: none; width: 100%; text-align: center; }
+.r-label { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 2px; color: var(--muted); margin-bottom: 6px; }
+.trough-val {
+  font-family: 'DM Serif Display', serif;
+  font-size: clamp(2.8rem, 9vw, 4.2rem); line-height: 1;
+  transition: color 0.5s;
+}
+.trough-unit { font-family: 'Space Mono', monospace; font-size: 0.75rem; color: var(--muted); margin-bottom: 14px; }
+.status-badge {
+  display: inline-block; padding: 5px 18px; border-radius: 100px;
+  font-size: 0.72rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+  margin-bottom: 14px; transition: all 0.5s;
+}
+.range-bar { width: 100%; height: 8px; background: var(--surface2); border-radius: 100px; overflow: hidden; margin: 4px 0; }
+.range-fill { height: 100%; border-radius: 100px; width: 0; transition: width 0.9s cubic-bezier(.34,1.56,.64,1); }
+.zone-labels { display: flex; justify-content: space-between; font-size: 0.58rem; font-family: 'Space Mono', monospace; color: var(--muted); margin-top: 3px; }
+.reco { margin-top: 14px; padding: 12px 14px; background: var(--surface2); border-left: 3px solid var(--accent); border-radius: 0 10px 10px 0; font-size: 0.78rem; line-height: 1.65; text-align: left; display: none; }
+
+/* Model breakdown */
+.model-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; width: 100%; }
+.model-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; text-align: left; }
+.model-card .mc-label { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.model-card .mc-val { font-family: 'Space Mono', monospace; font-size: 1.05rem; font-weight: 700; }
+.mc-rf  .mc-val { color: var(--accent); }
+.mc-xgb .mc-val { color: var(--accent2); }
+.mc-pk  .mc-val { color: #b46fff; }
+.mc-ens .mc-val { color: var(--accent4); }
+
+/* PK params */
+.pk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.pk-item { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
+.pk-label { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+.pk-val { font-family: 'Space Mono', monospace; font-size: 0.95rem; font-weight: 700; color: var(--text); }
+.pk-unit { font-size: 0.58rem; color: var(--muted); }
+
+/* History */
+.hist-list { display: flex; flex-direction: column; gap: 8px; }
+.hist-item {
+  display: flex; align-items: center; gap: 10px; padding: 9px 12px;
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; font-size: 0.75rem; animation: fadeIn 0.35s ease;
+}
+.hist-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.hist-val { font-family: 'Space Mono', monospace; font-size: 0.88rem; font-weight: 700; min-width: 58px; }
+.hist-meta { color: var(--muted); font-size: 0.62rem; }
+.hist-time { color: var(--muted); font-size: 0.6rem; margin-left: auto; font-family: 'Space Mono', monospace; }
+.no-hist { color: var(--muted); font-size: 0.78rem; text-align: center; padding: 6px; }
+
+/* ── MODEL INFO TAB ── */
+.metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 28px; }
+@media (max-width: 700px) { .metrics-grid { grid-template-columns: 1fr 1fr; } }
+.metric-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px;
+}
+.metric-card .mc-model { font-size: 0.65rem; text-transform: uppercase; letter-spacing: 1.5px; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+.metric-card .mc-r2  { font-family: 'DM Serif Display', serif; font-size: 2.2rem; line-height: 1; }
+.metric-card .mc-sub { font-size: 0.7rem; color: var(--muted); margin-top: 4px; font-family: 'Space Mono', monospace; }
+.feat-bar-wrap { display: flex; flex-direction: column; gap: 10px; }
+.feat-row { display: grid; grid-template-columns: 120px 1fr 50px; align-items: center; gap: 10px; }
+.feat-name { font-size: 0.75rem; color: var(--muted); font-family: 'Space Mono', monospace; }
+.feat-track { background: var(--surface2); border-radius: 100px; height: 6px; overflow: hidden; }
+.feat-fill  { height: 100%; border-radius: 100px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+.feat-pct   { font-family: 'Space Mono', monospace; font-size: 0.68rem; color: var(--accent); text-align: right; }
+.section-title { font-family: 'DM Serif Display', serif; font-size: 1.3rem; margin-bottom: 18px; color: var(--text); }
+.info-section { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 28px; margin-bottom: 22px; }
+
+/* Error toast */
+.toast {
+  position: fixed; bottom: 28px; right: 28px;
+  background: #1a0808; border: 1px solid rgba(255,100,100,0.4);
+  border-radius: 12px; padding: 14px 20px;
+  color: var(--accent3); font-size: 0.82rem; z-index: 999;
+  display: none; animation: slideIn 0.3s ease;
+}
+@keyframes slideIn { from { opacity:0; transform: translateY(16px); } to { opacity:1; transform: translateY(0); } }
+@keyframes fadeDown { from { opacity:0; transform: translateY(-14px); } to { opacity:1; transform: translateY(0); } }
+@keyframes fadeUp   { from { opacity:0; transform: translateY(18px); } to { opacity:1; transform: translateY(0); } }
+@keyframes fadeIn   { from { opacity:0; transform: translateX(-6px); } to { opacity:1; transform: translateX(0); } }
+select option { background: #0f2035; }
+canvas#bg { position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.35; }
+</style>
+</head>
+<body>
+
+<canvas id="bg"></canvas>
+
+<div class="wrapper">
+
+<!-- HEADER -->
+<header>
+  <div class="logo-block">
+    <div class="logo-icon">💊</div>
+    <div class="logo-text">
+      <h1>VancoPred</h1>
+      <p>Clinical Decision Support · AI-Powered</p>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="backend-status">
+      <div class="status-dot" id="sdot"></div>
+      <span id="slabel">Connecting…</span>
+    </div>
+    <div class="badge">Flask + Sklearn</div>
+  </div>
+</header>
+
+<!-- HERO -->
+<div class="hero">
+  <h2>Predict <em>Vancomycin</em><br>Trough Concentrations</h2>
+  <p>Real-time pharmacokinetic prediction powered by your trained ML models. Enter patient parameters — the backend computes predictions using the exact Random Forest and XGBoost pipelines from your notebooks.</p>
+  <div class="model-pills">
+    <div class="pill rf">🌲 Random Forest</div>
+    <div class="pill xgb" id="xgb-pill">⚡ XGBoost</div>
+    <div class="pill ens">🎯 Ensemble</div>
+    <div class="pill pk">📐 Traditional PK</div>
+  </div>
+</div>
+
+<!-- TABS -->
+<div class="tab-bar">
+  <button class="tab-btn active" onclick="switchTab('predictor', this)">🔬 Predictor</button>
+  <button class="tab-btn" onclick="switchTab('models', this)">📊 Model Info</button>
+  <button class="tab-btn" onclick="switchTab('about', this)">ℹ️ About</button>
+</div>
+
+<!-- ══════════════════════════ TAB: PREDICTOR ══════════════════════════ -->
+<div class="tab-content active" id="tab-predictor">
+<div class="main-grid">
+
+  <!-- LEFT: FORM -->
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">👤</div>
+      <h3>Patient Parameters</h3>
+      <span class="sub">Live → Flask Backend</span>
+    </div>
+    <div class="card-body">
+
+      <div class="sec-label">Demographics</div>
+      <div class="grid-2">
+        <div class="ig">
+          <label>Age <span class="unit">years</span></label>
+          <input type="range" id="age" min="18" max="90" value="65" oninput="syncSlider(this);schedulePredict()">
+          <div class="slider-row"><span>18</span><span class="cur" id="age-v">65</span><span>90</span></div>
+        </div>
+        <div class="ig">
+          <label>Gender</label>
+          <div class="gender-toggle">
+            <input type="radio" id="fem" name="gender" value="0">
+            <label for="fem">♀ Female</label>
+            <input type="radio" id="mal" name="gender" value="1" checked>
+            <label for="mal">♂ Male</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="ig">
+          <label>Weight <span class="unit">kg</span></label>
+          <input type="range" id="weight" min="30" max="150" value="75" step="0.5" oninput="syncSlider(this);schedulePredict()">
+          <div class="slider-row"><span>30</span><span class="cur" id="weight-v">75</span><span>150</span></div>
+        </div>
+        <div class="ig">
+          <label>Height <span class="unit">cm</span></label>
+          <input type="range" id="height" min="140" max="210" value="170" oninput="syncSlider(this);schedulePredict()">
+          <div class="slider-row"><span>140</span><span class="cur" id="height-v">170</span><span>210</span></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="sec-label">Renal Function</div>
+
+      <div class="ig">
+        <label>Serum Creatinine <span class="unit">mg/dL</span></label>
+        <input type="range" id="serum_creatinine" min="0.5" max="5.0" value="1.2" step="0.1" oninput="syncSlider(this);schedulePredict()">
+        <div class="slider-row"><span>0.5</span><span class="cur" id="serum_creatinine-v">1.2</span><span>5.0</span></div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="sec-label">Dosing Regimen</div>
+
+      <div class="grid-2">
+        <div class="ig">
+          <label>Dose <span class="unit">mg</span></label>
+          <select id="dose" onchange="schedulePredict()">
+            <option value="500">500 mg</option>
+            <option value="750">750 mg</option>
+            <option value="1000" selected>1000 mg</option>
+            <option value="1250">1250 mg</option>
+            <option value="1500">1500 mg</option>
+          </select>
+        </div>
+        <div class="ig">
+          <label>Interval <span class="unit">hrs</span></label>
+          <select id="dosing_interval" onchange="schedulePredict()">
+            <option value="8">q8h — every 8h</option>
+            <option value="12" selected>q12h — every 12h</option>
+            <option value="24">q24h — every 24h</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="grid-2">
+        <div class="ig">
+          <label>Infusion Duration <span class="unit">hrs</span></label>
+          <select id="duration_of_infusion" onchange="schedulePredict()">
+            <option value="1">1 hr</option>
+            <option value="1.5" selected>1.5 hr</option>
+            <option value="2">2 hr</option>
+          </select>
+        </div>
+        <div class="ig">
+          <label>Time to Trough <span class="unit">hrs pre-dose</span></label>
+          <input type="range" id="time_to_trough" min="0.5" max="2.0" value="1.0" step="0.1" oninput="syncSlider(this);schedulePredict()">
+          <div class="slider-row"><span>0.5</span><span class="cur" id="time_to_trough-v">1.0</span><span>2.0</span></div>
+        </div>
+      </div>
+
+      <button class="predict-btn" id="pred-btn" onclick="runPredict()">
+        <div class="spinner" id="spinner"></div>
+        <span id="btn-text">⚡ Predict via ML Backend</span>
+      </button>
+
+    </div>
+  </div>
+
+  <!-- RIGHT -->
+  <div class="right-panel">
+
+    <!-- Result -->
+    <div class="card result-card" id="res-card">
+      <div class="card-header">
+        <div class="card-icon">📊</div>
+        <h3>Prediction</h3>
+        <span class="sub" id="pred-timestamp"></span>
+      </div>
+      <div class="result-body">
+        <div class="empty-state" id="empty">
+          <div class="ei">🔬</div>
+          Enter patient parameters<br>and click predict. Results<br>come directly from your<br>trained ML models.
+        </div>
+        <div class="result-inner" id="res-inner">
+          <div class="r-label">Predicted Trough — Ensemble</div>
+          <div class="trough-val" id="tval">—</div>
+          <div class="trough-unit">mg/L</div>
+          <div class="status-badge" id="sbadge">—</div>
+          <div class="range-bar"><div class="range-fill" id="rfill"></div></div>
+          <div class="zone-labels"><span>0</span><span>10 (low)</span><span>20 (high)</span><span>35</span></div>
+          <div class="reco" id="reco"></div>
+          <div class="model-grid">
+            <div class="model-card mc-rf">
+              <div class="mc-label">🌲 Random Forest</div>
+              <div class="mc-val" id="mc-rf">—</div>
+              <div style="font-size:.6rem;color:var(--muted)">mg/L</div>
+            </div>
+            <div class="model-card mc-xgb" id="xgb-mcard">
+              <div class="mc-label">⚡ XGBoost</div>
+              <div class="mc-val" id="mc-xgb">—</div>
+              <div style="font-size:.6rem;color:var(--muted)">mg/L</div>
+            </div>
+            <div class="model-card mc-pk">
+              <div class="mc-label">📐 Traditional PK</div>
+              <div class="mc-val" id="mc-pk">—</div>
+              <div style="font-size:.6rem;color:var(--muted)">mg/L</div>
+            </div>
+            <div class="model-card mc-ens">
+              <div class="mc-label">🎯 Ensemble Avg</div>
+              <div class="mc-val" id="mc-ens">—</div>
+              <div style="font-size:.6rem;color:var(--muted)">mg/L</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PK Params -->
+    <div class="card">
+      <div class="card-header"><div class="card-icon">⚗️</div><h3>Derived PK Params</h3></div>
+      <div class="card-body">
+        <div class="pk-grid">
+          <div class="pk-item"><div class="pk-label">CrCl (C-G)</div><div class="pk-val" id="pk-crcl">—</div><div class="pk-unit">mL/min</div></div>
+          <div class="pk-item"><div class="pk-label">BMI</div><div class="pk-val" id="pk-bmi">—</div><div class="pk-unit">kg/m²</div></div>
+          <div class="pk-item"><div class="pk-label">Daily Dose</div><div class="pk-val" id="pk-daily">—</div><div class="pk-unit">mg/day</div></div>
+          <div class="pk-item"><div class="pk-label">Dose / Weight</div><div class="pk-val" id="pk-dwt">—</div><div class="pk-unit">mg/kg</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- History -->
+    <div class="card">
+      <div class="card-header"><div class="card-icon">🕓</div><h3>Prediction History</h3></div>
+      <div class="card-body">
+        <div class="hist-list" id="hist-list"><div class="no-hist">No predictions yet</div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════════ TAB: MODEL INFO ══════════════════════════ -->
+<div class="tab-content" id="tab-models">
+  <div class="info-section">
+    <div class="section-title">Model Performance Metrics</div>
+    <div class="metrics-grid" id="metrics-grid">
+      <div style="color:var(--muted);font-size:.85rem;padding:20px">Loading from backend…</div>
+    </div>
+    <div class="section-title" style="margin-top:28px">Feature Importance — Random Forest</div>
+    <div class="feat-bar-wrap" id="feat-bars">
+      <div style="color:var(--muted);font-size:.85rem">Loading…</div>
+    </div>
+  </div>
+  <div class="info-section">
+    <div class="section-title">How the Backend Works</div>
+    <p style="font-size:.88rem;line-height:1.85;color:var(--muted)">
+      When you click <strong style="color:var(--text)">Predict</strong>, the browser sends a JSON POST request to <code style="color:var(--accent);background:var(--surface2);padding:2px 6px;border-radius:4px">/predict</code> on the Flask server. The server:
+    </p>
+    <ol style="margin-top:14px;padding-left:20px;font-size:.85rem;color:var(--muted);line-height:2.1">
+      <li>Computes derived features: <strong style="color:var(--text)">BMI</strong>, <strong style="color:var(--text)">CrCl (Cockcroft-Gault)</strong>, <strong style="color:var(--text)">daily_dose</strong></li>
+      <li>Builds a DataFrame with the same 12-column feature order the models were trained on</li>
+      <li>Calls <code style="color:var(--accent2)">rf.predict(patient_df)</code> — the actual trained Random Forest object</li>
+      <li>Calls <code style="color:var(--accent2)">xgb.predict(patient_df)</code> — the actual trained XGBoost object</li>
+      <li>Computes a traditional PK baseline: <code style="color:var(--accent4)">(dose × 0.015) − (CrCl × 0.03) + 12</code></li>
+      <li>Returns all four values as JSON → frontend renders them instantly</li>
+    </ol>
+    <p style="margin-top:16px;font-size:.85rem;color:var(--muted)">
+      The models are trained <strong style="color:var(--text)">once at startup</strong> on 500 synthetic samples (same logic as your notebooks, seed=42 for reproducibility). In production, swap in real clinical data.
+    </p>
+  </div>
+</div>
+
+<!-- ══════════════════════════ TAB: ABOUT ══════════════════════════ -->
+<div class="tab-content" id="tab-about">
+  <div class="info-section">
+    <div class="section-title">Better Approaches for This Project</div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px">
+
+      <div style="background:var(--surface2);border:1px solid rgba(0,200,255,0.15);border-radius:14px;padding:20px">
+        <div style="color:var(--accent);font-size:.65rem;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:600">🏆 Best Approach</div>
+        <div style="font-size:.95rem;font-weight:600;margin-bottom:8px">Non-linear Mixed Effects (NONMEM / Monolix)</div>
+        <p style="font-size:.8rem;color:var(--muted);line-height:1.7">
+          The gold standard in clinical PK. Models inter-patient variability explicitly using population PK parameters (Vd, CL). FDA-accepted. Works on small real datasets (&lt;50 patients). Produces individual Bayesian estimates.
+        </p>
+      </div>
+
+      <div style="background:var(--surface2);border:1px solid rgba(0,255,157,0.15);border-radius:14px;padding:20px">
+        <div style="color:var(--accent2);font-size:.65rem;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:600">💡 Hybrid Approach (Recommended)</div>
+        <div style="font-size:.95rem;font-weight:600;margin-bottom:8px">PK-ML Hybrid (Mechanistic + Data-Driven)</div>
+        <p style="font-size:.8rem;color:var(--muted);line-height:1.7">
+          Use Cockcroft-Gault CrCl and one-compartment PK equations to compute initial estimates, then train ML on <em>residuals</em>. Combines interpretability of PK with predictive power of ML. Works well with limited data.
+        </p>
+      </div>
+
+      <div style="background:var(--surface2);border:1px solid rgba(255,209,102,0.15);border-radius:14px;padding:20px">
+        <div style="color:var(--accent4);font-size:.65rem;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:600">📈 Improvement to Current</div>
+        <div style="font-size:.95rem;font-weight:600;margin-bottom:8px">Bayesian Forecasting (MAP)</div>
+        <p style="font-size:.8rem;color:var(--muted);line-height:1.7">
+          Feed in a prior (population PK) and update it with 1-2 observed trough measurements using Maximum A Posteriori. This is how real TDM software (DoseMeRx, InsightRx) works. Far more accurate for individual patients.
+        </p>
+      </div>
+
+      <div style="background:var(--surface2);border:1px solid rgba(180,100,255,0.15);border-radius:14px;padding:20px">
+        <div style="color:#b46fff;font-size:.65rem;text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px;font-weight:600">🚀 Upgrade Current Models</div>
+        <div style="font-size:.95rem;font-weight:600;margin-bottom:8px">Use Real Data + Cross-Validation</div>
+        <p style="font-size:.8rem;color:var(--muted);line-height:1.7">
+          Current notebooks use synthetic data — R² looks good because the model just re-learns its own formula. With real patient data, add nested cross-validation, SHAP explainability, confidence intervals, and calibration curves.
+        </p>
+      </div>
+    </div>
+
+    <div style="font-size:.82rem;color:var(--muted);line-height:1.8;background:var(--surface2);border-radius:12px;padding:18px;border-left:3px solid var(--accent3)">
+      ⚠️ <strong style="color:var(--text)">Critical Note for Panel:</strong> The current synthetic data target is generated using a simple linear formula — so the ML model essentially re-learns that formula. Real clinical performance will be lower. The next step is to source a real vancomycin TDM dataset (MIMIC-III, PharmVar, or institutional data) and rerun the pipeline with proper external validation.
+    </div>
+  </div>
+</div>
+
+</div><!-- /wrapper -->
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ──────────────────────────────────────────
+// PARTICLE BG
+// ──────────────────────────────────────────
+const cv = document.getElementById('bg');
+const cx = cv.getContext('2d');
+let pts = [];
+function resizeCv() { cv.width = innerWidth; cv.height = innerHeight; }
+resizeCv(); addEventListener('resize', resizeCv);
+for (let i=0;i<50;i++) pts.push({x:Math.random()*innerWidth,y:Math.random()*innerHeight,r:Math.random()*1.2+0.3,dx:(Math.random()-.5)*.25,dy:(Math.random()-.5)*.25,a:Math.random()*.5+.1});
+function drawBg(){cx.clearRect(0,0,cv.width,cv.height);for(const p of pts){cx.beginPath();cx.arc(p.x,p.y,p.r,0,Math.PI*2);cx.fillStyle=`rgba(0,200,255,${p.a})`;cx.fill();p.x+=p.dx;p.y+=p.dy;if(p.x<0||p.x>cv.width)p.dx*=-1;if(p.y<0||p.y>cv.height)p.dy*=-1;}requestAnimationFrame(drawBg);}
+drawBg();
+
+// ──────────────────────────────────────────
+// TABS
+// ──────────────────────────────────────────
+function switchTab(id, btn) {
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-'+id).classList.add('active');
+  if (id === 'models') loadModelInfo();
+}
+
+// ──────────────────────────────────────────
+// SLIDER SYNC
+// ──────────────────────────────────────────
+function syncSlider(el) {
+  const min=parseFloat(el.min), max=parseFloat(el.max), val=parseFloat(el.value);
+  const pct=((val-min)/(max-min)*100).toFixed(1);
+  el.style.setProperty('--pct', pct+'%');
+  const v = document.getElementById(el.id+'-v');
+  if (v) v.textContent = val;
+  updatePKLive();
+}
+document.querySelectorAll('input[type=range]').forEach(syncSlider);
+
+// ──────────────────────────────────────────
+// LIVE PK PARAMS (browser-side, instant)
+// ──────────────────────────────────────────
+function getFormValues() {
+  return {
+    age:    parseFloat(document.getElementById('age').value),
+    weight: parseFloat(document.getElementById('weight').value),
+    height: parseFloat(document.getElementById('height').value),
+    gender: parseFloat(document.querySelector('input[name=gender]:checked').value),
+    serum_creatinine: parseFloat(document.getElementById('serum_creatinine').value),
+    dose:   parseFloat(document.getElementById('dose').value),
+    dosing_interval:  parseFloat(document.getElementById('dosing_interval').value),
+    duration_of_infusion: parseFloat(document.getElementById('duration_of_infusion').value),
+    time_to_trough:   parseFloat(document.getElementById('time_to_trough').value),
+  };
+}
+
+function updatePKLive() {
+  const v = getFormValues();
+  const bmi = v.weight / Math.pow(v.height/100, 2);
+  const daily = (v.dose*24)/v.dosing_interval;
+  let crcl = ((140-v.age)*v.weight)/(72*v.serum_creatinine);
+  if (v.gender===0) crcl*=0.85;
+  document.getElementById('pk-crcl').textContent  = crcl.toFixed(1);
+  document.getElementById('pk-bmi').textContent   = bmi.toFixed(1);
+  document.getElementById('pk-daily').textContent = daily.toFixed(0);
+  document.getElementById('pk-dwt').textContent   = (v.dose/v.weight).toFixed(1);
+}
+document.querySelectorAll('input[type=range],select,input[type=radio]').forEach(el=>{
+  el.addEventListener('input', updatePKLive);
+  el.addEventListener('change', updatePKLive);
+});
+updatePKLive();
+
+// ──────────────────────────────────────────
+// PREDICT — calls /predict on Flask backend
+// ──────────────────────────────────────────
+let predictTimer = null;
+function schedulePredict() {
+  clearTimeout(predictTimer);
+  predictTimer = setTimeout(runPredict, 350);
+}
+
+async function runPredict() {
+  const btn = document.getElementById('pred-btn');
+  const spinner = document.getElementById('spinner');
+  const btnText = document.getElementById('btn-text');
+
+  spinner.style.display = 'block';
+  btnText.textContent = 'Computing…';
+  btn.disabled = true;
+
+  try {
+    const payload = getFormValues();
+    const resp = await fetch('/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+
+    if (!resp.ok) throw new Error(`Server error: ${resp.status}`);
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error);
+
+    renderResult(data);
+    updatePKLive(); // also update derived from server values
+    // Update derived params from server (more accurate)
+    const d = data.derived_params;
+    document.getElementById('pk-crcl').textContent  = d.crcl;
+    document.getElementById('pk-bmi').textContent   = d.bmi;
+    document.getElementById('pk-daily').textContent = d.daily_dose;
+    document.getElementById('pk-dwt').textContent   = d.dose_per_kg;
+
+    addHistory(data.predictions.ensemble, payload);
+
+  } catch (e) {
+    showToast('❌ Backend error: ' + e.message + ' — Is Flask running on port 5000?');
+  } finally {
+    spinner.style.display = 'none';
+    btnText.textContent = '⚡ Predict via ML Backend';
+    btn.disabled = false;
+  }
+}
+
+// ──────────────────────────────────────────
+// RENDER RESULT
+// ──────────────────────────────────────────
+function renderResult(data) {
+  document.getElementById('empty').style.display = 'none';
+  document.getElementById('res-inner').style.display = 'block';
+  document.getElementById('res-card').classList.add('lit');
+
+  const p = data.predictions;
+  const interp = data.interpretation;
+
+  animateNumber(document.getElementById('tval'), p.ensemble);
+  document.getElementById('mc-rf').textContent  = p.random_forest.toFixed(2);
+  document.getElementById('mc-xgb').textContent = p.xgboost !== null ? p.xgboost.toFixed(2) : 'N/A';
+  document.getElementById('mc-pk').textContent  = p.traditional_pk.toFixed(2);
+  document.getElementById('mc-ens').textContent = p.ensemble.toFixed(2);
+
+  const tv = document.getElementById('tval');
+  tv.style.color = interp.color;
+
+  const badge = document.getElementById('sbadge');
+  badge.textContent = interp.emoji + ' ' + interp.status;
+  badge.style.background = interp.color + '18';
+  badge.style.borderColor = interp.color + '55';
+  badge.style.color = interp.color;
+  badge.style.border = '1px solid';
+
+  const pct = Math.min((p.ensemble/35)*100, 100);
+  const fill = document.getElementById('rfill');
+  fill.style.width = '0%';
+  setTimeout(()=>{ fill.style.width = pct+'%'; fill.style.background = `linear-gradient(90deg, #8888ff, ${interp.color})`; }, 100);
+
+  const reco = document.getElementById('reco');
+  reco.style.display = 'block';
+  reco.style.borderLeftColor = interp.color;
+  reco.textContent = interp.recommendation;
+
+  document.getElementById('pred-timestamp').textContent = new Date().toLocaleTimeString();
+}
+
+// ──────────────────────────────────────────
+// ANIMATED NUMBER
+// ──────────────────────────────────────────
+function animateNumber(el, target) {
+  const start = parseFloat(el.textContent) || 0;
+  const t0 = performance.now();
+  function step(now) {
+    const t = Math.min((now-t0)/700, 1);
+    const ease = 1-Math.pow(1-t,4);
+    el.textContent = (start+(target-start)*ease).toFixed(2);
+    if (t<1) requestAnimationFrame(step);
+    else el.textContent = target.toFixed(2);
+  }
+  requestAnimationFrame(step);
+}
+
+// ──────────────────────────────────────────
+// HISTORY
+// ──────────────────────────────────────────
+let history = [];
+function statusColor(v) {
+  if (v<10) return '#8888ff';
+  if (v<=20) return '#00ff9d';
+  if (v<=25) return '#ffd166';
+  return '#ff6b6b';
+}
+function addHistory(val, params) {
+  history.unshift({ val, params, time: new Date() });
+  if (history.length > 6) history.pop();
+  const list = document.getElementById('hist-list');
+  list.innerHTML = history.map(h=>{
+    const c = statusColor(h.val);
+    const t = h.time.toLocaleTimeString('en-US',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    return `<div class="hist-item" style="border-color:${c}25">
+      <div class="hist-dot" style="background:${c};box-shadow:0 0 6px ${c}"></div>
+      <div>
+        <div class="hist-val" style="color:${c}">${h.val.toFixed(2)} mg/L</div>
+        <div class="hist-meta">Age ${h.params.age} · ${h.params.weight}kg · SCr ${h.params.serum_creatinine} · ${h.params.dose}mg q${h.params.dosing_interval}h</div>
+      </div>
+      <div class="hist-time">${t}</div>
+    </div>`;
+  }).join('');
+}
+
+// ──────────────────────────────────────────
+// LOAD MODEL INFO FROM /model-info
+// ──────────────────────────────────────────
+let modelInfoLoaded = false;
+async function loadModelInfo() {
+  if (modelInfoLoaded) return;
+  try {
+    const r = await fetch('/model-info');
+    const d = await r.json();
+    modelInfoLoaded = true;
+
+    // Metrics grid
+    const mg = document.getElementById('metrics-grid');
+    const xgb = d.xgboost;
+    mg.innerHTML = `
+      <div class="metric-card">
+        <div class="mc-model">🌲 Random Forest</div>
+        <div class="mc-r2" style="color:var(--accent)">${d.random_forest.test_r2}</div>
+        <div class="mc-sub">Test R²</div>
+        <div style="margin-top:10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--muted)">
+          RMSE: ${d.random_forest.test_rmse}<br>MAE: ${d.random_forest.test_mae}
+        </div>
+      </div>
+      ${xgb ? `<div class="metric-card">
+        <div class="mc-model">⚡ XGBoost</div>
+        <div class="mc-r2" style="color:var(--accent2)">${xgb.test_r2}</div>
+        <div class="mc-sub">Test R²</div>
+        <div style="margin-top:10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--muted)">
+          RMSE: ${xgb.test_rmse}<br>MAE: ${xgb.test_mae}
+        </div>
+      </div>` : `<div class="metric-card"><div class="mc-model">⚡ XGBoost</div><div style="color:var(--muted);font-size:.8rem;margin-top:10px">Not installed.<br><code>pip install xgboost</code></div></div>`}
+      <div class="metric-card">
+        <div class="mc-model">📐 Traditional PK</div>
+        <div class="mc-r2" style="color:#b46fff">${d.traditional_pk.test_r2}</div>
+        <div class="mc-sub">Test R²</div>
+        <div style="margin-top:10px;font-family:'Space Mono',monospace;font-size:.72rem;color:var(--muted)">
+          MAE: ${d.traditional_pk.test_mae}<br>Baseline comparison
+        </div>
+      </div>
+    `;
+
+    // Feature importance bars
+    const maxImp = d.feature_importance[0].importance;
+    const fb = document.getElementById('feat-bars');
+    fb.innerHTML = d.feature_importance.map(f=>`
+      <div class="feat-row">
+        <div class="feat-name">${f.feature}</div>
+        <div class="feat-track"><div class="feat-fill" style="width:${(f.importance/maxImp*100).toFixed(1)}%"></div></div>
+        <div class="feat-pct">${(f.importance*100).toFixed(1)}%</div>
+      </div>
+    `).join('');
+
+  } catch(e) {
+    document.getElementById('metrics-grid').innerHTML = `<div style="color:var(--accent3);font-size:.82rem;padding:10px">Cannot reach backend. Start Flask first.</div>`;
+  }
+}
+
+// ──────────────────────────────────────────
+// BACKEND STATUS CHECK
+// ──────────────────────────────────────────
+async function checkBackend() {
+  try {
+    const r = await fetch('/model-info', { signal: AbortSignal.timeout(2000) });
+    if (r.ok) {
+      document.getElementById('sdot').className = 'status-dot online';
+      document.getElementById('slabel').textContent = 'Backend online';
+    } else throw new Error();
+  } catch {
+    document.getElementById('sdot').className = 'status-dot offline';
+    document.getElementById('slabel').textContent = 'Backend offline';
+  }
+}
+checkBackend();
+setInterval(checkBackend, 10000);
+
+// ──────────────────────────────────────────
+// TOAST
+// ──────────────────────────────────────────
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.display = 'block';
+  setTimeout(()=>{ t.style.display='none'; }, 5000);
+}
+
+// Initial auto-predict on load
+window.addEventListener('load', ()=>{ setTimeout(runPredict, 800); });
+</script>
+</body>
+</html>
